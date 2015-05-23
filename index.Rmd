@@ -1,0 +1,76 @@
+---
+title: "Practical Machine Learning - Assignment"
+author: "Nithum"
+date: "May 18, 2015"
+output: html_document
+---
+
+## Load the caret package
+
+```{r, cache = TRUE}
+library(caret)
+```
+
+## Reading the training and test data
+```{r, cache = TRUE}
+dat <- read.csv('pml-training.csv')
+test <- read.csv('pml-testing.csv')
+```
+
+## Process the data to remove columns with few usable readings
+If you look at the data, a number of columns have mostly missing or NA values. Below, we check for these bad columns and remove them from the data set. We also remove useless columns like timestamps and row numbers.
+
+```{r, cache = TRUE}
+#Counts the number of bad (missing or NA) data points  of each column 
+numBadPoints <- list()
+for(c in names(dat)){
+  numBadPoints[c] <- length(which(dat[,c] == '' | is.na(dat[,c])))
+}
+#Selects a set of "good" columns without missing or NA data
+goodCols <- names(which(numBadPoints < 1000))
+
+#Processes the data by removing bad columns and extraneous columns
+procDat <- dat[,goodCols]
+procDat <- procDat[,-c(1,3,4,5,6,7)]
+```
+
+## Set up training and validation data sets
+We hold 40% of the data as validation data. We will use this in the future to estimate our out-of-sample error.
+```{r, cache = TRUE}
+trainInd <- createDataPartition(procDat$classe, p = 0.6, list = FALSE)
+trainData <- procDat[trainInd,]
+validData <- procDat[-trainInd,]
+```
+
+## Train the prediction algorithm
+We are going to train a decision tree as our prediction algorithm. We choose this algorithm due to its simplicity, interprability, and non-linearity. Simplicity is important as, due to our limited hardware, even random forests take too long to compute. We have no reason to believe our data fits a linear model and so a non-linear algorithm is preferred. Finally, interprability will allow us to gain better insight into the data.
+```{r, cache=TRUE}
+modFit <- train(classe ~ .,data = trainData, type="rpart")
+```
+
+## Check the out of sample error on the validation set
+We cross-validate our algorithm against the validation data set we held back earlier. This provides us with an out of sample accuracy estimate of 99.39%.
+```{r, cache = TRUE}
+predictions <- predict(modFit, validData[,-54])
+confusionMatrix(predictions, validData$classe)
+```
+
+## Perform the predictions on the test data and write to files
+Finally we generate the files needed from the test data set to complete the submission component of the assignment.
+```{r, cache = TRUE, eval = FALSE}
+testPredictions <- predict(modFit, test)
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+pml_write_files(testPredictions)
+```
+
+
+
+
+
+
